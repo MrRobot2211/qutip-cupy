@@ -7,6 +7,12 @@ import numbers
 import cupy as cp
 from qutip.core import data
 
+class MetaInit(type):
+
+    def __call__(cls, *args, **kwargs):
+        if args or kwargs:
+            return super().__call__(*args, **kwargs)
+        return cls.__new__(cls)
 
 class CuPyDense(data.Data):
     def __init__(self, data, shape=None, copy=True, dtype=cp.complex128):
@@ -84,7 +90,12 @@ class CuPyDense(data.Data):
         return cp.asnumpy(self._cp)
 
     def conj(self):
-        return CuPyDense._no_checks_constructor(self._cp.conj())
+        out = CuPyDense()
+        out._cp = self._cp.conj()
+        super(CuPyDense, out).__init__(data.shape)
+        out.dtype = data.dtype
+
+        return out
 
     def transpose(self):
         return CuPyDense._no_checks_constructor(self._cp.transpose())
