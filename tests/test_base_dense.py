@@ -54,6 +54,8 @@ class BenchWrap(BenchmarkFixture):
     def __init__(self):
         pass
 from pytest_benchmark.stats import Metadata
+from cupyx.time import repeat as cp_repeat
+
 class Wrapper(object):
     def __init__(self,wrapped_class):
         self.__dict__['wrapped_class'] = wrapped_class
@@ -87,6 +89,7 @@ class Wrapper(object):
         except Exception:
             self.has_error = True
             raise
+
     def _raw2(self, function_to_benchmark, *args, **kwargs):
         if self.enabled:
             runner = self._make_runner(function_to_benchmark, args, kwargs)
@@ -106,7 +109,9 @@ class Wrapper(object):
             self.statscpu.extra_info.update({'device':'gpu'})
 
             self._logger.debug("  Running %s rounds x %s iterations ..." % (rounds, iterations), yellow=True, bold=True)
-            results = cp.benchmark(repeat)
+            warmup_rounds = min(rounds, max(1, int(self._warmup / iterations)))
+            results = cp_repeat(function_to_benchmark, args, kwargs, n_warmup=warmup_rounds,max_time=self._max_time)
+
             for _,res in zip(XRANGE(rounds),results):
                 self.stats.update(res)
                 self.statscpu.update(res)
