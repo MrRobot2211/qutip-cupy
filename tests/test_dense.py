@@ -58,7 +58,7 @@ class TestCuPyDense:
 
 
 def test_no_checks_constr():
-    """Checks if CuPyDense canbe properly inherited"""
+    """Checks if CuPyDense can be properly inherited"""
 
     class wrapcpd(CuPyDense):
         pass
