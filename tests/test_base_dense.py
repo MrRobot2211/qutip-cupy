@@ -56,10 +56,11 @@ class BenchWrap(BenchmarkFixture):
 
 class Wrapper(object):
     def __init__(self,wrapped_class):
-        self.wrapped_class = wrapped_class
+        self.__dict__['wrapped_class'] = wrapped_class
 
     def __getattr__(self,attr):
-        orig_attr = self.wrapped_class.__getattribute__(attr)
+        #orig_attr = self.wrapped_class.__getattribute__(attr)
+        orig_attr = getattr(self.wrapped_class,attr)
         if callable(orig_attr):
             def hooked(*args, **kwargs):
                 result = orig_attr(*args, **kwargs)
@@ -70,9 +71,22 @@ class Wrapper(object):
             return hooked
         else:
             return orig_attr
+    def __setattr__(self,attr,value):
+        setattr(self.wrapped_class, attr,value)
 
-    def __call__(self,*args, **kwargs):
-        return self.wrapped_class(*args, **kwargs)
+    # def __call__(self,*args, **kwargs):
+    #     return self.wrapped_class(*args, **kwargs)
+    def __call__(self, function_to_benchmark, *args, **kwargs):
+        if self._mode:
+            self.has_error = True
+            raise FixtureAlreadyUsed(
+                "Fixture can only be used once. Previously it was used in %s mode." % self._mode)
+        try:
+            self._mode = 'benchmark(...)'
+            return self._raw(function_to_benchmark, *args, **kwargs)
+        except Exception:
+            self.has_error = True
+            raise
 
 import time
 @pytest.mark.benchmark(
