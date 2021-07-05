@@ -53,7 +53,7 @@ from pytest_benchmark.fixture import BenchmarkFixture
 class BenchWrap(BenchmarkFixture):
     def __init__(self):
         pass
-
+from pytest_benchmark.stats import Metadata
 class Wrapper(object):
     def __init__(self,wrapped_class):
         self.__dict__['wrapped_class'] = wrapped_class
@@ -87,6 +87,49 @@ class Wrapper(object):
         except Exception:
             self.has_error = True
             raise
+    def _raw2(self, function_to_benchmark, *args, **kwargs):
+        if self.enabled:
+            runner = self._make_runner(function_to_benchmark, args, kwargs)
+
+            duration, iterations, loops_range = self._calibrate_timer(runner)
+
+            # Choose how many time we must repeat the test
+            rounds = int(ceil(self._max_time / duration))
+            rounds = max(rounds, self._min_rounds)
+            rounds = min(rounds, sys.maxsize)
+
+            self.stats = self._make_stats(iterations)
+            self.stats.extra_info.update({'device':'all'})
+            self.statscpu = self._make_stats(iterations)
+            self.statscpu.extra_info.update({'device':'cpu'})
+            self.statsgpu = self._make_stats(iterations)
+            self.statscpu.extra_info.update({'device':'gpu'})
+
+            self._logger.debug("  Running %s rounds x %s iterations ..." % (rounds, iterations), yellow=True, bold=True)
+            results = cp.benchmark(repeat)
+            for _,res in zip(XRANGE(rounds),results):
+                self.stats.update(res)
+                self.statscpu.update(res)
+                self.statsgpu.update(res)
+            self._logger.debug("  Ran for %ss." % format_time(time.time() - run_start), yellow=True, bold=True)
+        
+        else:
+            function_result = function_to_benchmark(*args, **kwargs)
+        return function_result
+
+    def _make_stats(self, iterations):
+        bench_stats = Metadata(self, iterations=iterations, options={
+            "disable_gc": self._disable_gc,
+            "timer": self._timer,
+            "min_rounds": self._min_rounds,
+            "max_time": self._max_time,
+            "min_time": self._min_time,
+            "warmup": self._warmup,
+        })
+        self._add_stats(bench_stats)
+        #this makes it difficult to track
+        #self.stats = bench_stats
+        return bench_stats
 
 import time
 @pytest.mark.benchmark(
