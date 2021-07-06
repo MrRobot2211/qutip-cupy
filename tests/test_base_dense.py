@@ -112,12 +112,14 @@ class Wrapper(object):
             warmup_rounds = min(rounds, max(1, int(self._warmup / iterations)))
             results = cp_repeat(function_to_benchmark, args, kwargs, n_warmup=warmup_rounds,max_time=self._max_time)
 
-            for _,res in zip(XRANGE(rounds),results):
-                self.stats.update(res)
-                self.statscpu.update(res)
-                self.statsgpu.update(res)
+            for tim_cpu, tim_gpu in zip(results.cpu_times, results.gpu_times):
+
+                self.stats.update(tim_cpu+tim_gpu)
+                self.statscpu.update(tim_cpu)
+                self.statsgpu.update(tim_gpu)
+
             self._logger.debug("  Ran for %ss." % format_time(time.time() - run_start), yellow=True, bold=True)
-        
+
         else:
             function_result = function_to_benchmark(*args, **kwargs)
         return function_result
