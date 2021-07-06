@@ -54,6 +54,10 @@ class BenchWrap(BenchmarkFixture):
     def __init__(self):
         pass
 from pytest_benchmark.stats import Metadata
+import warnings
+
+
+
 from cupyx.time import repeat as cp_repeat
 
 class Wrapper(object):
@@ -85,21 +89,24 @@ class Wrapper(object):
                 "Fixture can only be used once. Previously it was used in %s mode." % self._mode)
         try:
             self._mode = 'benchmark(...)'
-            return self._raw(function_to_benchmark, *args, **kwargs)
+            return self._raw2(function_to_benchmark, *args, **kwargs)
         except Exception:
             self.has_error = True
             raise
 
     def _raw2(self, function_to_benchmark, *args, **kwargs):
         if self.enabled:
-            runner = self._make_runner(function_to_benchmark, args, kwargs)
+            #runner = self._make_runner(function_to_benchmark, args, kwargs)
 
-            duration, iterations, loops_range = self._calibrate_timer(runner)
+            #duration, iterations, loops_range = self._calibrate_timer(runner)
 
             # Choose how many time we must repeat the test
-            rounds = int(ceil(self._max_time / duration))
-            rounds = max(rounds, self._min_rounds)
-            rounds = min(rounds, sys.maxsize)
+            #rounds = int(ceil(self._max_time / duration))
+            #rounds = max(rounds, self._min_rounds)
+            #rounds = min(rounds, sys.maxsize)
+            iterations = 30
+            rounds = 5
+            warmup_rounds=10
 
             self.stats = self._make_stats(iterations)
             self.stats.extra_info.update({'device':'all'})
@@ -109,19 +116,27 @@ class Wrapper(object):
             self.statscpu.extra_info.update({'device':'gpu'})
 
             self._logger.debug("  Running %s rounds x %s iterations ..." % (rounds, iterations), yellow=True, bold=True)
-            warmup_rounds = min(rounds, max(1, int(self._warmup / iterations)))
-            results = cp_repeat(function_to_benchmark, args, kwargs, n_warmup=warmup_rounds,max_time=self._max_time)
+            
+            #warmup_rounds = min(rounds, max(1, int(self._warmup / iterations)))
 
-            for tim_cpu, tim_gpu in zip(results.cpu_times, results.gpu_times):
+            for _ in range(rounds):
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        action ='ignore',
+                        category = FutureWarning,
+                        message = r'cupyx.time.repeat is experimental.')
+                    results = cp_repeat(function_to_benchmark, args, kwargs, n_warmup= warmup_rounds,max_duration=self._max_time, n_repeat=iterations)
 
-                self.stats.update(tim_cpu+tim_gpu)
-                self.statscpu.update(tim_cpu)
-                self.statsgpu.update(tim_gpu)
+                for tim_cpu, tim_gpu in zip(results.cpu_times, results.gpu_times[0]):
 
-            self._logger.debug("  Ran for %ss." % format_time(time.time() - run_start), yellow=True, bold=True)
+                    self.stats.update(tim_cpu+tim_gpu)
+                    self.statscpu.update(tim_cpu)
+                    self.statsgpu.update(tim_gpu)
 
-        else:
-            function_result = function_to_benchmark(*args, **kwargs)
+           # self._logger.debug("  Ran for %ss." % format_time(time.time() - run_start), yellow=True, bold=True)
+
+        #else:
+        function_result = function_to_benchmark(*args, **kwargs)
         return function_result
 
     def _make_stats(self, iterations):
