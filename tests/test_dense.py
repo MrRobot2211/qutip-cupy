@@ -1,16 +1,11 @@
-import warnings
 import numpy as np
 import pytest
 
-with warnings.catch_warnings():
-    warnings.filterwarnings(
-        action="ignore", category=UserWarning, message=r"matplotlib not found:"
-    )
+from qutip_cupy import CuPyDense
+from qutip_cupy import dense
 
-    from qutip.core import data
-
-from qutip_cupy import CuPyDense  # noqa:E402
-from qutip_cupy import dense  # noqa:E402
+# import qutip after qutip_cupy to supress the matplotlib import warning
+from qutip.core import data
 
 
 @pytest.fixture(scope="function", params=((1, 2), (5, 10), (7, 3), (2, 5)))
@@ -65,40 +60,52 @@ def test_true_div(shape):
     array = np.random.uniform(size=shape) + 1.0j * np.random.uniform(size=shape)
 
     cup_arr = CuPyDense(array)
-    cpdense_tr = cup_arr / 2.0
-    qtpdense_tr = data.Dense(array) / 2.0
+    cpdense_over_2 = cup_arr / 2.0
+    qtpdense_over_2 = data.Dense(array) / 2.0
 
-    np.testing.assert_array_equal(cpdense_tr.to_array(), qtpdense_tr.to_array())
+    np.testing.assert_array_equal(cpdense_over_2.to_array(), qtpdense_over_2.to_array())
 
 
 def test_itrue_div(shape):
 
     array = np.random.uniform(size=shape) + 1.0j * np.random.uniform(size=shape)
+    cpd_array = CuPyDense(array)
 
-    cpdense_tr = CuPyDense(array).__itruediv__(2.0)
-    qtpdense_tr = data.Dense(array).__itruediv__(2.0)
+    cpd_array /= 2
+    qtpdense = data.Dense(array / 2)
 
-    np.testing.assert_array_equal(cpdense_tr.to_array(), qtpdense_tr.to_array())
+    np.testing.assert_array_equal(cpd_array.to_array(), qtpdense.to_array())
 
 
 def test_mul(shape):
 
     array = np.random.uniform(size=shape) + 1.0j * np.random.uniform(size=shape)
 
-    cpdense_tr = CuPyDense(array).__mul__(2.0 + 1.0j)
-    qtpdense_tr = data.Dense(array).__mul__(2.0 + 1.0j)
+    cpdense_mul = CuPyDense(array) * (2.0 + 1.0j)
+    qtpdense_mul = data.Dense(array) * (2.0 + 1.0j)
 
-    np.testing.assert_array_equal(cpdense_tr.to_array(), qtpdense_tr.to_array())
+    np.testing.assert_array_equal(cpdense_mul.to_array(), qtpdense_mul.to_array())
 
 
 def test_matmul(shape):
 
-    array = np.random.uniform(size=shape) + 1.0j * np.random.uniform(size=shape)
+    array1 = np.random.uniform(size=shape) + 1.0j * np.random.uniform(size=shape)
 
-    cpdense_tr = CuPyDense(array).__mul__(2.0 + 1.0j)
-    qtpdense_tr = data.Dense(array).__mul__(2.0 + 1.0j)
+    cpdense1 = CuPyDense(array1)
+    qtpdense1 = data.Dense(array1)
 
-    np.testing.assert_array_equal(cpdense_tr.to_array(), qtpdense_tr.to_array())
+    shape2 = (shape[1], np.random.choice([1, 2, 6, 7, 8]))
+    array2 = np.random.uniform(size=shape2) + 1.0j * np.random.uniform(size=shape2)
+
+    cpdense2 = CuPyDense(array2)
+    qtpdense2 = data.Dense(array2)
+
+    cpdense_matmul = cpdense1 @ cpdense2
+    qtpdense_matmul = qtpdense1 @ qtpdense2
+
+    np.testing.assert_array_almost_equal(
+        cpdense_matmul.to_array(), qtpdense_matmul.to_array(), decimal=10
+    )
 
 
 class TestFactoryMethods:

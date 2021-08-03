@@ -98,7 +98,7 @@ class CuPyDense(data.Data):
     def __add__(left, right):
         if not isinstance(left, CuPyDense) or not isinstance(right, CuPyDense):
             return NotImplemented
-        return CuPyDense._raw_cupy_constructor(cp.add(left._cp, right._cp))
+        return CuPyDense._raw_cupy_constructor(left._cp + right._cp)
 
     def __matmul__(left, right):
         if not isinstance(left, CuPyDense) or not isinstance(right, CuPyDense):
@@ -209,7 +209,6 @@ def diags(diagonals, offsets=None, shape=None):
             diagonals = [diagonals]
     except TypeError:
         raise TypeError("diagonals must be a list of arrays of complex") from None
-    diagonals_length = len(diagonals)
     if offsets is None:
         if len(diagonals) == 0:
             offsets = []
@@ -222,17 +221,16 @@ def diags(diagonals, offsets=None, shape=None):
     offsets = np.atleast_1d(offsets)
     if offsets.ndim > 1:
         raise ValueError("offsets must be a 1D array of integers")
-    if diagonals_length != len(offsets):
+    if len(diagonals) != len(offsets):
         raise ValueError("number of diagonals does not match number of offsets")
-    if diagonals_length == 0:
+    if len(diagonals) == 0:
         if shape is None:
             raise ValueError(
-                "cannot construct matrix" "with no diagonals without a shape"
+                "cannot construct matrix with no diagonals without a shape"
             )
         else:
             n_rows, n_cols = shape
         return zeros(n_rows, n_cols)
-
     order = np.argsort(offsets)
     diagonals_ = []
     offsets_ = []
@@ -264,7 +262,6 @@ def diags(diagonals, offsets=None, shape=None):
     out = zeros(n_rows, n_cols, fortran=True)
 
     for diag_idx in range(len(diagonals_)):
-
         out._cp.diagonal(offsets_[diag_idx])[:] = diagonals_[diag_idx]
 
     return out
@@ -321,8 +318,7 @@ def trace_cupydense(cpd_array):
 
 def imul_cupydense(cpd_array, value):
     """Multiply this CuPyDense `cpd_array` by a complex scalar `value`."""
-    cpd_array.__imul__(value)
-    return cpd_array
+    return cpd_array.__imul__(value)
 
 
 def mul_cupydense(cpd_array, value):
@@ -342,10 +338,13 @@ def matmul_cupydense(left, right, scale=1, out=None):
     where `left`, `right` and `out` are matrices.  `scale` is a complex scalar,
     defaulting to 1.
     """
-    if out:
-        return (left @ right) * scale + out
-    else:
+    # This may be done  more naturally with gemm from cupy.cublas
+    # but the GPU timings which are not very different.
+    if out is None:
         return (left @ right) * scale
+    else:
+        out += (left @ right) * scale
+        return out
 
 
 def add_cupydense(left, right, scale=1):
